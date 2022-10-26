@@ -145,6 +145,69 @@ public final class JVMBrainF {
         }
         {
             final MethodVisitor mv = cw.visitMethod(
+                Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC,
+                "write",
+                "(S)V",
+                null,
+                null
+            );
+            mv.visitCode();
+            final InstructionAdapter meth = new InstructionAdapter(mv);
+            meth.getstatic(
+                "java/lang/System",
+                "out",
+                "Ljava/io/PrintStream;"
+            );
+            meth.load(0, Type.INT_TYPE);
+            meth.cast(Type.SHORT_TYPE, Type.CHAR_TYPE);
+            meth.invokevirtual(
+                "java/io/PrintStream",
+                "print",
+                "(C)V",
+                false
+            );
+            meth.areturn(Type.VOID_TYPE);
+            mv.visitMaxs(-1, -1);
+            mv.visitEnd();
+        }
+        {
+            final MethodVisitor mv = cw.visitMethod(
+                Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC,
+                "read",
+                "()S",
+                null,
+                null
+            );
+            mv.visitCode();
+            final InstructionAdapter meth = new InstructionAdapter(mv);
+            final Label startLabel = new Label();
+            meth.mark(startLabel);
+            meth.getstatic(
+                "java/lang/System",
+                "in",
+                "Ljava/io/InputStream;"
+            );
+            meth.invokevirtual(
+                "java/io/InputStream",
+                "read",
+                "()I",
+                false
+            );
+            meth.dup();
+            final Label endLabel = new Label();
+            meth.iconst(10);
+            meth.ificmpne(endLabel);
+            meth.pop();
+            meth.goTo(startLabel);
+            meth.mark(endLabel);
+            meth.iconst(255);
+            meth.and(Type.SHORT_TYPE);
+            meth.areturn(Type.SHORT_TYPE);
+            mv.visitMaxs(-1, -1);
+            mv.visitEnd();
+        }
+        {
+            final MethodVisitor mv = cw.visitMethod(
                 Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC,
                 "main",
                 "([Ljava/lang/String;)V",
@@ -152,7 +215,7 @@ public final class JVMBrainF {
                 null
             );
             mv.visitCode();
-            compile(new InstructionAdapter(mv), source);
+            compile(new InstructionAdapter(mv), source, className);
             mv.visitEnd();
         }
         if (sourceFileName != null) {
@@ -162,7 +225,7 @@ public final class JVMBrainF {
         return cw;
     }
 
-    private static void compile(InstructionAdapter meth, String source) {
+    private static void compile(InstructionAdapter meth, String source, String className) {
         final Label[] startLabels = { new Label(), new Label(), new Label() };
         meth.mark(startLabels[0]);
         meth.visitLineNumber(1, startLabels[0]);
@@ -217,21 +280,10 @@ public final class JVMBrainF {
                         runType.compile(meth, runDelta);
                         runType = null;
                     }
-                    meth.getstatic(
-                        "java/lang/System",
-                        "out",
-                        "Ljava/io/PrintStream;"
-                    );
                     meth.load(2, InstructionAdapter.OBJECT_TYPE);
                     meth.load(1, Type.INT_TYPE);
                     meth.aload(Type.SHORT_TYPE);
-                    meth.cast(Type.SHORT_TYPE, Type.CHAR_TYPE);
-                    meth.invokevirtual(
-                        "java/io/PrintStream",
-                        "print",
-                        "(C)V",
-                        false
-                    );
+                    meth.invokestatic(className, "write", "(S)V", false);
                     break;
                 case ',':
                     if (runType != null) {
@@ -240,19 +292,7 @@ public final class JVMBrainF {
                     }
                     meth.load(2, InstructionAdapter.OBJECT_TYPE);
                     meth.load(1, Type.INT_TYPE);
-                    meth.getstatic(
-                        "java/lang/System",
-                        "in",
-                        "Ljava/io/InputStream;"
-                    );
-                    meth.invokevirtual(
-                        "java/io/InputStream",
-                        "read",
-                        "()I",
-                        false
-                    );
-                    meth.iconst(255);
-                    meth.and(Type.SHORT_TYPE);
+                    meth.invokestatic(className, "read", "()S", false);
                     meth.astore(Type.SHORT_TYPE);
                     break;
                 case '[': {
