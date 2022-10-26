@@ -7,7 +7,13 @@ group = "io.github.gaming32"
 version = "1.0-SNAPSHOT"
 
 application {
-    mainClass.set("io.github.gaming32.JVMBrainF")
+    mainClass.set("io.github.gaming32.jvmbrainf.JVMBrainF")
+}
+
+tasks.withType<Jar> {
+    manifest {
+        attributes["Main-Class"] = application.mainClass.get()
+    }
 }
 
 repositories {
