@@ -165,6 +165,7 @@ public final class JVMBrainF {
     private static void compile(InstructionAdapter meth, String source) {
         final Label[] startLabels = { new Label(), new Label(), new Label() };
         meth.mark(startLabels[0]);
+        meth.visitLineNumber(1, startLabels[0]);
         meth.iconst(0);
         meth.store(1, Type.INT_TYPE);
         meth.mark(startLabels[1]);
@@ -183,6 +184,9 @@ public final class JVMBrainF {
                 case '\n':
                     line++;
                     column = 0;
+                    final Label lineLabel = new Label();
+                    meth.mark(lineLabel);
+                    meth.visitLineNumber(line, lineLabel);
                     break;
                 case '>':
                 case '<':
