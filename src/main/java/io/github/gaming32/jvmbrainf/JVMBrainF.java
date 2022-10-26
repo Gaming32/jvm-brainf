@@ -25,6 +25,39 @@ public final class JVMBrainF {
         }
     }
 
+    private enum RunType {
+        POINTER {
+            @Override
+            void compile(InstructionAdapter meth, int delta) {
+                if (delta == 0) return;
+                meth.load(1, Type.INT_TYPE);
+                meth.iconst(Math.abs(delta));
+                meth.visitInsn(delta > 0 ? Opcodes.IADD : Opcodes.ISUB);
+                meth.iconst(MEMORY_SIZE - 1);
+                meth.and(Type.INT_TYPE);
+                meth.store(1, Type.INT_TYPE);
+            }
+        },
+        VALUE {
+            @Override
+            void compile(InstructionAdapter meth, int delta) {
+                if (delta == 0) return;
+                meth.load(2, InstructionAdapter.OBJECT_TYPE);
+                meth.dup();
+                meth.load(1, Type.INT_TYPE);
+                meth.dupX1();
+                meth.aload(Type.SHORT_TYPE);
+                meth.iconst(Math.abs(delta));
+                meth.visitInsn(delta > 0 ? Opcodes.IADD : Opcodes.ISUB);
+                meth.iconst(255);
+                meth.and(Type.SHORT_TYPE);
+                meth.astore(Type.SHORT_TYPE);
+            }
+        };
+
+        abstract void compile(InstructionAdapter meth, int delta);
+    }
+
     private JVMBrainF() {
     }
 
@@ -141,6 +174,8 @@ public final class JVMBrainF {
         meth.mark(startLabels[2]);
         final Deque<LoopEntry> loopStack = new ArrayDeque<>();
         int line = 1, column = 0;
+        RunType runType = null;
+        int runDelta = 0;
         for (int i = 0, limit = source.length(); i < limit; i++) {
             column++;
             final char c = source.charAt(i);
@@ -151,27 +186,33 @@ public final class JVMBrainF {
                     break;
                 case '>':
                 case '<':
-                    meth.load(1, Type.INT_TYPE);
-                    meth.iconst(1);
-                    meth.visitInsn(c == '>' ? Opcodes.IADD : Opcodes.ISUB);
-                    meth.iconst(MEMORY_SIZE - 1);
-                    meth.and(Type.INT_TYPE);
-                    meth.store(1, Type.INT_TYPE);
+                    if (runType == RunType.POINTER) {
+                        runDelta += c == '>' ? 1 : -1;
+                    } else {
+                        if (runType != null) {
+                            runType.compile(meth, runDelta);
+                        }
+                        runDelta = c == '>' ? 1 : -1;
+                        runType = RunType.POINTER;
+                    }
                     break;
                 case '+':
                 case '-':
-                    meth.load(2, InstructionAdapter.OBJECT_TYPE);
-                    meth.dup();
-                    meth.load(1, Type.INT_TYPE);
-                    meth.dupX1();
-                    meth.aload(Type.SHORT_TYPE);
-                    meth.iconst(1);
-                    meth.visitInsn(c == '+' ? Opcodes.IADD : Opcodes.ISUB);
-                    meth.iconst(255);
-                    meth.and(Type.SHORT_TYPE);
-                    meth.astore(Type.SHORT_TYPE);
+                    if (runType == RunType.VALUE) {
+                        runDelta += c == '+' ? 1 : -1;
+                    } else {
+                        if (runType != null) {
+                            runType.compile(meth, runDelta);
+                        }
+                        runDelta = c == '+' ? 1 : -1;
+                        runType = RunType.VALUE;
+                    }
                     break;
                 case '.':
+                    if (runType != null) {
+                        runType.compile(meth, runDelta);
+                        runType = null;
+                    }
                     meth.getstatic(
                         "java/lang/System",
                         "out",
@@ -189,6 +230,10 @@ public final class JVMBrainF {
                     );
                     break;
                 case ',':
+                    if (runType != null) {
+                        runType.compile(meth, runDelta);
+                        runType = null;
+                    }
                     meth.load(2, InstructionAdapter.OBJECT_TYPE);
                     meth.load(1, Type.INT_TYPE);
                     meth.getstatic(
@@ -207,6 +252,10 @@ public final class JVMBrainF {
                     meth.astore(Type.SHORT_TYPE);
                     break;
                 case '[': {
+                    if (runType != null) {
+                        runType.compile(meth, runDelta);
+                        runType = null;
+                    }
                     final LoopEntry labels = new LoopEntry(line, column);
                     meth.mark(labels.start);
                     meth.load(2, InstructionAdapter.OBJECT_TYPE);
@@ -217,6 +266,10 @@ public final class JVMBrainF {
                     break;
                 }
                 case ']': {
+                    if (runType != null) {
+                        runType.compile(meth, runDelta);
+                        runType = null;
+                    }
                     if (loopStack.isEmpty()) {
                         throw new IllegalArgumentException("Mismatched ] at line " + line + ", column " + column);
                     }
@@ -225,6 +278,9 @@ public final class JVMBrainF {
                     meth.mark(labels.end);
                 }
             }
+        }
+        if (runType != null) {
+            runType.compile(meth, runDelta);
         }
         if (!loopStack.isEmpty()) {
             final LoopEntry labels = loopStack.pop();
